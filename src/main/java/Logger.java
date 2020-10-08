@@ -1,87 +1,215 @@
 import javax.swing.*;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
-import java.io.BufferedWriter;
-import java.io.File;
-import java.io.FileWriter;
-import java.io.IOException;
+import java.io.*;
+import java.text.SimpleDateFormat;
+import java.util.Date;
 
-public  class Logger implements ActionListener {
+public class Logger implements ActionListener {
 
-    private Timer timer;
-    private int delay=1;
+    private static Timer timer;
+    private int delay = 1000;
     private String dirPath;
-    private String filePath;
+    private final String historyPath = "History.txt";
+    private final String tempFilename = "temp";
+    private final String SYS_MESSAGE = "Logger";
+    private final String SYS_LAST_CLOSE = "上次正常關閉時間:";
+    private final String SYS_CREATE_NEW = "歷史檔案不存在,重新建立";
+
+    private final String SYS_ABNORMAL = "上次程式異常關閉";
+    private static final String SYS_OPEN = "Open_Time ";
+    private static final String SYS_CLOSE = "Close_Time ";
+    private static final String SYS_ABNORMAL_CLOSE="Abnormal_Time ";
     private static Logger instance;
-    private File tempFile;
-    private File history;
-    public Logger(){
-        java.net.URL url=this.getClass().getResource("/");
+    private static File tempFile;
+    private static File historyFile;
+    private static boolean abnormal_shutdown=false;
 
+    public Logger() throws IOException {
+        java.net.URL url = this.getClass().getResource("/");
+
+        dirPath = this.getClass().getResource("/").getPath();
+        System.out.println(dirPath);
         System.out.println(url);
-        timer=new Timer(delay,this);
-//        timer.start();
-        File save=new File((String)url,"save.txt");
-        String dirpath = saveDia.getDirectory();//獲取儲存檔案路徑並儲存到字串中。
-        String fileName = saveDia.getFile() + ".txt";////獲取打儲存檔名稱並儲存到字串中
+        tempFile = new File(dirPath + tempFilename);//臨時記錄檔
+        historyFile = new File(dirPath + historyPath);
 
-        if (dirpath == null || fileName == null)//判斷路徑和檔案是否為空
-            return;//空操作
-        else
-            file = new File(dirpath, fileName);//檔案不為空，新建一個路徑和名稱
+        if (historyFile.exists()) {
+            //如果history存在
+            if (!tempFile.exists()) {
+                //且tempFile不存在,表示正常關閉,顯示正常關閉時間
 
-        try {
-            BufferedWriter bufw = new BufferedWriter(new FileWriter(file));
-            String text = textOutput.getText();//獲取文字內容
-            bufw.write(text);//將獲取文字內容寫入到字元輸出流
-            bufw.close();//關閉檔案
-        } catch (IOException e1) {
-            e1.printStackTrace();//丟擲IO異常
+                JOptionPane.showMessageDialog(null, readLastTime(historyFile), SYS_MESSAGE, JOptionPane.INFORMATION_MESSAGE);
+                System.out.println(readLastTime(historyFile));
+            } else {
+                //如果tempFile存在,沒有把暫存檔刪掉表示異常關閉,顯示異常關閉時間
+                abnormal_shutdown=true;
+                //將此次執行時間加入歷史文件
+                writeData(historyFile,  SYS_ABNORMAL_CLOSE+ readRecord(tempFile));
+                deleteFile(tempFile);
+                JOptionPane.showMessageDialog(null, readLastTime(historyFile), SYS_ABNORMAL, JOptionPane.WARNING_MESSAGE);
+                System.out.println(readLastTime(historyFile));
+
+            }
+
+        } else {
+            //如果檔案不存在,建立新檔案
+            JOptionPane.showMessageDialog(null, SYS_CREATE_NEW, SYS_MESSAGE, JOptionPane.INFORMATION_MESSAGE);
+
+            createFile(historyFile);
+
+            //預設如果歷史文件不存在,就代表重新開始,檢查是否有過去留下來的temp,有的話把它也刪掉
+            deleteFile(tempFile);
         }
 
+        System.out.println("創建臨時檔案");
+        createFile(tempFile);
+        writeData(tempFile, getTimeText());
+        writeData(historyFile, SYS_OPEN + getTimeText());
 
-
+        timer = new Timer(delay, this);
+        timer.start();
 
     }
-    public Logger getInstance(){
-        if(instance==null){
-            synchronized (Logger.class){
-            instance=new Logger();
+
+    public static Logger getInstance() {
+        if (instance == null) {
+            synchronized (Logger.class) {
+                try {
+                    instance = new Logger();
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
             }
         }
         return instance;
-
-
-
     }
 
-    @Override
     public void actionPerformed(ActionEvent e) {
 
+        try {
+            writeData(tempFile, getTimeText());
+        } catch (IOException ioException) {
+            ioException.printStackTrace();
+        }
 
     }
 
-/*    public static void record(){
-        String dirpath = saveDia.getDirectory();//獲取儲存檔案路徑並儲存到字串中。
-        String fileName = saveDia.getFile() + ".txt";////獲取打儲存檔名稱並儲存到字串中
-
-        if (dirpath == null || fileName == null)//判斷路徑和檔案是否為空
-            return;//空操作
-        else
-            file = new File(dirpath, fileName);//檔案不為空，新建一個路徑和名稱
-
+    public static void exit() {
+        timer.stop();
         try {
-            BufferedWriter bufw = new BufferedWriter(new FileWriter(file));
-            String text = textOutput.getText();//獲取文字內容
-            bufw.write(text);//將獲取文字內容寫入到字元輸出流
+            writeData(historyFile, SYS_CLOSE + getTimeText());
+
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        deleteFile(tempFile);
+
+    }
+
+    private static void writeData(File file, String s) throws IOException {
+        if (file.exists()) {
+            BufferedWriter bufw = new BufferedWriter(new FileWriter(file, true));//由於希望記錄是往下新增,使用append
+            bufw.write(s + "\n");//將獲取文字內容寫入到字元輸出流
             bufw.close();//關閉檔案
-        } catch (IOException e1) {
-            e1.printStackTrace();//丟擲IO異常
+        } else {
+            throw new FileNotFoundException("檔案不存在");
+        }
+
+    }
+
+    private static String getTimeText() {
+
+        //取得目前時間,並將格式化後的資料存成字串
+        Date date = new Date();
+        SimpleDateFormat sdFormat = new SimpleDateFormat("yyyy/MM/dd hh:mm:ss");
+        return sdFormat.format(date);//獲取文字內容
+
+    }
+
+    private static void deleteFile(File file) {
+        if (file.exists()) {
+            if (file.isFile()) {//如果是一個標轉檔案
+                file.delete();
+
+            } else {
+                //如果是一整個資料夾,把資料夾下所有的文件刪除,此案例雖然用不到,但之後可以做為其他專案參考
+                File fileLists[] = file.listFiles();
+                for (File f : fileLists) {
+
+                    deleteFile(f);
+                }
+            }
         }
     }
-});*/
+
+    private static void createFile(File file) {
+        if (!file.exists()) {//傳入的檔案路徑不存在檔案
+            file.getParentFile().mkdirs();//避免連parent資料夾也不存在,幫它直接建立一個
+            try {
+                file.createNewFile();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        }
+    }
+
+    private static String readLastTime(File file) throws IOException {
+
+
+
+        if (!file.exists() || file.isDirectory() || !file.canRead()) {
+            return null;
+        }
+
+
+        BufferedReader br = new BufferedReader(new FileReader(file));
+        String open = "";
+        String close = "";
+        String current="";
+        while (br.ready()) {
+            current=br.readLine();
+            if (current.startsWith(SYS_OPEN)) {
+
+                open = current;
+               // System.out.println("open"+open);
+            } else if(abnormal_shutdown==true){
+                if(current.startsWith(SYS_ABNORMAL_CLOSE)){
+                    close=current;
+                }
+
+
+            }else{
+                if(current.startsWith(SYS_CLOSE)){
+                    close=current;
+                }
+
+            }
+
+        }
+        br.close();
+
+        return open+"\n"+close;//這邊目前只打算抓最後一筆
 
     }
+
+    private static String readRecord(File file) throws IOException {
+        if (!file.exists() || file.isDirectory() || !file.canRead()) {
+            return null;
+
+
+        }
+        String currentLine = "";
+
+        BufferedReader br = new BufferedReader(new FileReader(file));
+        while (br.ready()) {
+            currentLine = br.readLine();
+        }
+        br.close();
+        return currentLine;//這邊目前只打算抓最後一筆
+    }
+
+}
 
 
 
