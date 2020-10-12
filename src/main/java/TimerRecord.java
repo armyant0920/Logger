@@ -5,7 +5,7 @@ import java.io.*;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 
-public class Logger implements ActionListener {
+public class TimerRecord implements ActionListener {
 
     private static Timer timer;
     private int delay = 1000;
@@ -20,12 +20,12 @@ public class Logger implements ActionListener {
     private static final String SYS_OPEN = "Open_Time ";
     private static final String SYS_CLOSE = "Close_Time ";
     private static final String SYS_ABNORMAL_CLOSE="Abnormal_Time ";
-    private static Logger instance;
+    private static TimerRecord instance;
     private static File tempFile;
     private static File historyFile;
     private static boolean abnormal_shutdown=false;
 
-    public Logger() throws IOException {
+    public TimerRecord() throws IOException {
         java.net.URL url = this.getClass().getResource("/");
 
         dirPath = this.getClass().getResource("/").getPath();
@@ -72,11 +72,11 @@ public class Logger implements ActionListener {
 
     }
 
-    public static Logger getInstance() {
+    public static TimerRecord getInstance() {
         if (instance == null) {
-            synchronized (Logger.class) {
+            synchronized (TimerRecord.class) {
                 try {
-                    instance = new Logger();
+                    instance = new TimerRecord();
                 } catch (IOException e) {
                     e.printStackTrace();
                 }
